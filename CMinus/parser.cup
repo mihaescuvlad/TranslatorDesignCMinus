@@ -1,0 +1,181 @@
+/*
+   Simple +/-/* expression language; 
+   parser evaluates constant expressions on the fly
+*/
+
+package cup.example;
+
+import java_cup.runtime.*;
+import cup.example.Lexer;
+import java.io.IOException;
+import java.io.File;
+import java.io.FileInputStream;
+
+parser code {:
+	protected Lexer lexer;
+	protected MultiTree syntaxTree = new MultiTree();
+
+	public MultiTree getSyntaxTree() { return syntaxTree; }
+
+	protected MultiTreeNode createDeclarationNode(MultiTreeNode declaration) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createReturnNode(MultiTreeNode expr) {throw new UnsupportedOperationException();}
+ 	protected MultiTreeNode createFunctionDeclarationNode(MultiTreeNode typeSpecifier, String identifierName, MultiTreeNode paramsList, MultiTreeNode compoundStatement) {throw new UnsupportedOperationException();}
+  	protected MultiTreeNode createFunctionCallNode(String functionName, MultiTreeNode params) { throw new UnsupportedOperationException();}
+	protected MultiTreeNode createEmptyParamsList() { throw new UnsupportedOperationException();}
+	protected MultiTreeNode createTypeSpecifier(String typeName) { throw new UnsupportedOperationException();}
+	protected MultiTreeNode createListNode(String listName, MultiTreeNode firstChild) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createVarDeclaration(MultiTreeNode typeSpecifier, String identifierName, Integer value) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createVarDeclaration(MultiTreeNode typeSpecifier, String identifierName, MultiTreeNode valueNode) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createCompoundStatement(MultiTreeNode compoundBody) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createIfStatement(MultiTreeNode identifier, MultiTreeNode ifInstructions, MultiTreeNode elseInstructions) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createWhileStatement(MultiTreeNode condition, MultiTreeNode body) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createOperandNode(Object operand) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createAssignmentNode(String variableName, MultiTreeNode valueNode) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createArithmeticNode(String operator, MultiTreeNode leftOperand, MultiTreeNode rightOperand) {throw new UnsupportedOperationException();}
+	protected MultiTreeNode createComparisonNode(String operator, Object leftOperand, Object rightOperand) {throw new UnsupportedOperationException();}
+:}
+
+/* define how to connect to the scanner! */
+init with {:
+	ComplexSymbolFactory f = new ComplexSymbolFactory();
+	symbolFactory = f;
+	File file = new File("input.txt");
+	FileInputStream fis = null;
+	try {
+		fis = new FileInputStream(file);
+	} catch (IOException e) {
+		e.printStackTrace();
+	} 
+	lexer = new Lexer(f,fis);
+:};
+scan with {: return lexer.next_token(); :};
+
+/* Terminals (tokens returned by the scanner). */
+terminal			INT, VOID;
+terminal			PLUS, MINUS, TIMES, DIVIDE, MODULUS;
+terminal			LEQ, LT, GEQ, GT, EQ, NEQ, ASSIGN;
+terminal			WHILE, IF, ELSE, RETURN;
+terminal            COMMA, SEMI, LPAREN, RPAREN, LBRACE, RBRACE;
+terminal String		ID;
+terminal Integer    NUMBER;        // our scanner provides numbers as integers
+
+/* Non terminals */
+
+non terminal MultiTreeNode program_unit;
+non terminal MultiTreeNode declaration;
+non terminal MultiTreeNode function_definition;
+non terminal MultiTreeNode function_call;
+non terminal MultiTreeNode call_params_list;
+non terminal MultiTreeNode type_specifier;
+non terminal MultiTreeNode fun_param;
+non terminal MultiTreeNode params_list;
+non terminal MultiTreeNode var_declaration;
+non terminal MultiTreeNode compound_statement;
+non terminal MultiTreeNode compound_body;
+non terminal MultiTreeNode instructions_list;
+non terminal MultiTreeNode statement;
+non terminal MultiTreeNode expression;
+
+/* Precedences */
+precedence left EQ, NEQ;
+precedence left LT, LEQ, GT, GEQ;
+precedence left PLUS, MINUS;
+precedence left TIMES, DIVIDE, MODULUS;
+
+precedence left ELSE;
+
+/* The grammar rules */
+    
+program_unit
+	::= declaration:d				{: RESULT = syntaxTree.create("ProgramUnit", d); :}
+	| program_unit:pu declaration:d	{: RESULT = pu; syntaxTree.addChildNode(d); :}
+	;
+	
+declaration
+	::= function_definition:fdef 	{: RESULT = createDeclarationNode(fdef); :}
+	| var_declaration:vdef 			{: RESULT = createDeclarationNode(vdef); :}
+	;
+	
+function_definition
+	::= type_specifier:ts ID:id LPAREN params_list:pl RPAREN compound_statement:cs	{: RESULT = createFunctionDeclarationNode(ts, id, pl, cs); :}
+	| type_specifier:ts ID:id LPAREN RPAREN compound_statement:cs					{: RESULT = createFunctionDeclarationNode(ts, id, null, cs); :}
+	| type_specifier:ts ID:id LPAREN params_list:pl RPAREN SEMI						{: RESULT = createFunctionDeclarationNode(ts, id, pl, null); :}
+	| type_specifier:ts ID:id LPAREN RPAREN SEMI									{: RESULT = createFunctionDeclarationNode(ts, id, null, null); :}
+	;
+
+function_call
+    ::= ID:id LPAREN call_params_list:pl RPAREN		{: RESULT = createFunctionCallNode(id, pl); :}
+    ;
+    
+call_params_list
+    ::= expression:expr								{: RESULT = createListNode("CallParamsList", expr); :}
+    | call_params_list:pl COMMA expression:expr		{: RESULT = pl; RESULT.addChild(expr); :}
+    | /* empty */									{: RESULT = createEmptyParamsList(); :}
+    ;
+	
+type_specifier
+	::= INT									{: RESULT = createTypeSpecifier("INT");	:}
+	| VOID									{: RESULT = createTypeSpecifier("VOID"); :}
+	;
+	
+fun_param
+	::= type_specifier:ts ID:id				{: RESULT = createVarDeclaration(ts, id, 0);	:}
+	;
+	
+params_list
+	::= fun_param:fp						{: RESULT = createListNode("ParametersList", fp); :}
+	| params_list:pl COMMA fun_param:fp		{: RESULT = pl; RESULT.addChild(fp); :}		
+	;
+	
+var_declaration
+	::= type_specifier:ts ID:id SEMI								{: RESULT = createVarDeclaration(ts, id, 0); :}
+	| type_specifier:ts ID:id ASSIGN NUMBER:cval SEMI				{: RESULT = createVarDeclaration(ts, id, cval); :}
+	| type_specifier:ts ID:id ASSIGN function_call:fcall SEMI		{: RESULT = createVarDeclaration(ts, id, fcall); :}
+	;
+	
+compound_statement
+	::= LBRACE RBRACE															{: RESULT = createCompoundStatement(null); :}
+	| LBRACE compound_body:cb RBRACE											{: RESULT = createCompoundStatement(cb); :}
+	;
+	
+compound_body
+    ::= var_declaration:d                                                       {: RESULT = createListNode("CompoundBody", d); :}
+    | statement:st                                                          	{: RESULT = createListNode("CompoundBody", st); :}
+    | compound_body:cb var_declaration:d                                        {: RESULT = cb; cb.addChild(d); :}
+    | compound_body:cb statement:st                                         	{: RESULT = cb; cb.addChild(st); :}
+    ;
+	
+instructions_list
+	::= statement:st															{: RESULT = createListNode("InstructionsList", st); :}
+	| instructions_list:il statement:st											{: RESULT = il;	RESULT.addChild(st); :}	
+	;
+	
+statement
+	::= ID:id ASSIGN expression:expr SEMI											{: RESULT = createAssignmentNode(id, expr); :}
+	| IF LPAREN expression:cond RPAREN statement:ifBody ELSE statement:elseBody		{: RESULT = createIfStatement(cond, ifBody, elseBody); :}
+    | IF LPAREN expression:cond RPAREN statement:ifBody								{: RESULT = createIfStatement(cond, ifBody, null); :}
+    | WHILE LPAREN expression:cond RPAREN statement:body							{: RESULT = createWhileStatement(cond, body); :}
+	| RETURN expression:expr SEMI													{: RESULT = createReturnNode(expr); :}
+	| RETURN SEMI																	{: RESULT = createReturnNode(null); :}
+	| function_call:fc SEMI															{: RESULT = fc; :}
+	| compound_statement:cs															{: RESULT = cs; :}
+	;
+	
+expression
+    ::= expression:lhs PLUS expression:rhs		{: RESULT = createArithmeticNode("PLUS", lhs, rhs); :}
+    | expression:lhs MINUS expression:rhs		{: RESULT = createArithmeticNode("MINUS", lhs, rhs); :}
+    | expression:lhs TIMES expression:rhs		{: RESULT = createArithmeticNode("TIMES", lhs, rhs); :}
+    | expression:lhs DIVIDE expression:rhs		{: RESULT = createArithmeticNode("DIVIDE", lhs, rhs); :}
+    | expression:lhs MODULUS expression:rhs		{: RESULT = createArithmeticNode("MOD", lhs, rhs); :}
+    | expression:lhs LEQ expression:rhs			{: RESULT = createComparisonNode("LEQ", lhs, rhs); :}
+    | expression:lhs LT expression:rhs			{: RESULT = createComparisonNode("LT", lhs, rhs); :}
+    | expression:lhs GEQ expression:rhs			{: RESULT = createComparisonNode("GEQ", lhs, rhs); :}
+    | expression:lhs GT expression:rhs			{: RESULT = createComparisonNode("GT", lhs, rhs); :}
+    | expression:lhs EQ expression:rhs			{: RESULT = createComparisonNode("EQ", lhs, rhs); :}
+    | expression:lhs NEQ expression:rhs			{: RESULT = createComparisonNode("NEQ", lhs, rhs); :}
+    | LPAREN expression:expr RPAREN				{: RESULT = expr; :}
+    | function_call:fc							{: RESULT = fc; :}
+    | NUMBER:n									{: RESULT = createOperandNode(n); :}
+    | ID:id										{: RESULT = createOperandNode(id); :}
+    ;
+       
