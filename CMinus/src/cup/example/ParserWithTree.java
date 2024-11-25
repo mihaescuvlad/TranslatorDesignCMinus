@@ -22,14 +22,18 @@ public class ParserWithTree extends Parser {
 
 	
 	protected MultiTreeNode createFunctionDeclarationNode(MultiTreeNode typeSpecifier, String identifierName, MultiTreeNode paramsList, MultiTreeNode compoundStatement) {
-		MultiTreeNode newNode = new MultiTreeNode("FunctionDeclaration", identifierName);
-		newNode.addChild(typeSpecifier);
-		
-		if(paramsList != null) { newNode.addChild(paramsList); }
-		
-		newNode.addChild(compoundStatement);
-		
-		return newNode;
+	    MultiTreeNode newNode = new MultiTreeNode("FunctionDeclaration", identifierName);
+	    newNode.addChild(typeSpecifier);
+
+	    if (paramsList != null && paramsList.getChildren().length > 0) {
+	        newNode.addChild(paramsList);
+	    }
+
+	    if (compoundStatement != null) {
+	        newNode.addChild(compoundStatement);
+	    }
+
+	    return newNode;
 	}
 	
 	protected MultiTreeNode createFunctionCallNode(String functionName, MultiTreeNode params) {

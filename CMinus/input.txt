@@ -2,13 +2,19 @@
 
 int gcd(int u, int v)
 {
+	x = input();
 	if(v == 0) {
-		return u;
+		return u + k;
 	}
 	else {
 		return gcd(v, u-u/v*v);
 		/* u-u/v*v == u mod v */
 	}
+}
+
+int gcd(int u, int v)
+{
+	return u + v;
 }
 
 void main()
@@ -18,4 +24,10 @@ void main()
 	x = input();
 	y = input();
 	output(gcd(x,y));
+	
+	if(x > 0) {
+		int z;
+	}
+	z = input();
+	gcd(i, j);
 }
